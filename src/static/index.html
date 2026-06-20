@@ -1,0 +1,88 @@
+<h1>TuneServer testing environment</h1>
+<h3>%%version%%</h3>
+<table border="2">
+  <tr>
+    <th>GET</th>
+    <td><a href="/api/playlists">/api/playlists</a></td>
+  </tr>
+  <tr>
+    <th>GET</th>
+    <td><a href="/api/version">/api/version</a></td>
+  </tr>
+  <tr>
+    <th>GET</th>
+    <td><a href="/file/1">/file/1</a></td>
+  </tr>
+  <tr>
+    <th>POST</th>
+    <td><a href="/api/query" data-post="test1">/api/query</a></td>
+  </tr>
+</table>
+<div class="result">
+  <pre id="res"></pre>
+</div>
+<script>
+const libraryQueryExample = {
+  category: {
+    title: 'VGR',
+    columns: [
+      {
+        type: 'grouping',
+        orderBy: 'value',
+        orderDirection: 'asc',
+        subColumns: ['value', 'albumCount', 'trackCount'],
+      },
+      {
+        type: 'albumartist',
+        orderBy: 'albumCount',
+        orderDirection: 'desc',
+        subColumns: ['value', 'albumCount', 'trackCount'],
+      },
+      {
+        type: 'album',
+        orderBy: 'value',
+        orderDirection: 'asc',
+        subColumns: ['value', 'year', 'trackCount'],
+      },
+    ],
+    selector: [
+      {primaryDirectory: 'Game music covers'},
+    ],
+  },
+  //selectedColumns: ['Sonic the Hedgehog 2', 'YoshiBlade', 'Candy Corn II: The Sequeling'],
+  selectedColumns: [],
+}
+
+async function runLibraryPost(url, data) {
+  const payload = JSON.stringify(data)
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: payload,
+  })
+  const text = await res.text()
+  try {
+    const result = JSON.parse(text)
+    return {error: false, result}
+  }
+  catch {
+    return {error: true, result: text}
+  }
+}
+
+const postLinks = [...document.querySelectorAll('a[data-post]')]
+postLinks.forEach(postLink => {
+  postLink.addEventListener('click', async ev => {
+    ev.preventDefault()
+    const post = ev.target.getAttribute('data-post')
+    const href = ev.target.getAttribute('href')
+    if (post === 'test1') {
+      const data = await runLibraryPost(href, libraryQueryExample)
+      if (data.error) {
+        console.error('data', data.result)
+      }
+      document.querySelector('#res').innerText = `${JSON.stringify(data.result, null, 2)}`
+    }
+  })
+})
+</script>
