@@ -3,3 +3,5 @@
 
 export type * from './lib/indexer/types.ts'
 export type * from './lib/query/types.ts'
+export type * from './lib/server/types.ts'
+export type * from './util/version.ts'

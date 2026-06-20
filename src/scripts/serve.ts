@@ -14,6 +14,7 @@ import {validateLibraryQuery} from '../lib/query/validate.ts'
 import type {LibraryQuery} from '../lib/query/types.ts'
 import {getTemplate} from '../lib/server/template.ts'
 import {getOutputTracks, getOutputColumns} from '../lib/indexer/data.ts'
+import type {VersionResponse, PlaylistsResponse, QueryResponse, ErrorResponse} from '../lib/server/types.ts'
 
 dotenv.config({quiet: true})
 
@@ -25,7 +26,7 @@ async function runServer() {
   const port = process.env.PORT ?? '8226'
 
   app.use(cors())
-  app.use(express.json())               
+  app.use(express.json())
 
   /**
    * GET /
@@ -42,7 +43,7 @@ async function runServer() {
    * 
    * Returns the playlists (both smart and regular) that we're showing files from.
    */
-  app.get('/file/:id', (req: Request, res: Response) => {
+  app.get('/file/:id', (req: Request, res: Response): ErrorResponse | void => {
     const track = tx.db.getTrackByID(Number(req.params.id))
     if (track == null) {
       return getJSONResponse(res, {error: 'Track not found'}, 404)
@@ -66,7 +67,7 @@ async function runServer() {
    * 
    * Returns the playlists (both smart and regular) that we're showing files from.
    */
-  app.post('/api/query', (req: Request, res: Response) => {
+  app.post('/api/query', (req: Request, res: Response): QueryResponse => {
     const query = req.body as LibraryQuery
     const valid = validateLibraryQuery(query)
     if (!valid) {
@@ -85,9 +86,9 @@ async function runServer() {
    * 
    * Returns the playlists (both smart and regular) that we're showing files from.
    */
-  app.get('/api/playlists', (req: Request, res: Response) => {
+  app.get('/api/playlists', (req: Request, res: Response): PlaylistsResponse => {
     const data = tx.getPlaylists()
-    return getJSONResponse(res, data)
+    return getJSONResponse(res, {playlists: data})
   })
 
   /**
@@ -95,7 +96,7 @@ async function runServer() {
    * 
    * Returns the current version.
    */
-  app.get('/api/version', (req: Request, res: Response) => {
+  app.get('/api/version', (req: Request, res: Response): VersionResponse => {
     const data = getVersion()
     return getJSONResponse(res, data)
   })
