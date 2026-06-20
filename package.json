@@ -3,6 +3,12 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
+  "types": "./src/types.ts",
+  "exports": {
+    ".": {
+      "types": "./src/types.ts"
+    }
+  },
   "scripts": {
     "serve": "node src/scripts/serve.ts",
     "reindex": "node src/scripts/reindex.ts",
