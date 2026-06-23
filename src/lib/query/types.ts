@@ -1,7 +1,7 @@
 // @dada78641/tuneserver <https://github.com/dada78641/tuneserver>
 // © MIT license
 
-import type {Track} from '../indexer/db.ts'
+import type {Track} from '../indexer/types.ts'
 
 export type OrderDirection = 'asc' | 'desc'
 
@@ -49,5 +49,5 @@ export interface LibraryCategory {
 // A request for information from the library.
 export interface LibraryQuery {
   category: LibraryCategory
-  selectedColumns: (string | null)[]
+  selectedColumns: (string[] | null)[]
 }

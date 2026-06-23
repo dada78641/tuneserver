@@ -3,6 +3,28 @@
 
 import type {TTFileTags} from '@dada78641/tunetags'
 
+export interface Track {
+  id?: number
+  title: string
+  album: string
+  albumartist: string
+  genre: string
+  year: string | null
+  stars: number | null
+  grouping: string
+  filename: string
+  filedir: string
+  filemtime: number
+  track: string
+  trackOf: string
+  duration: number
+}
+
+export interface Playlist {
+  id: number
+  title: string
+}
+
 export interface File {
   baseIdentifier: string
   filePrimaryDirectory: string

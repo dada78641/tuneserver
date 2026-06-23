@@ -75,8 +75,12 @@ export const libraryQuerySchema: JSONSchemaType<LibraryQuery> = {
       type: 'array',
       minItems: 0,
       items: {
-        type: 'string',
+        type: 'array',
         nullable: true,
+        items: {
+          type: 'string',
+          nullable: false,
+        }
       },
     },
   },

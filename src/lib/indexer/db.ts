@@ -2,30 +2,8 @@
 // © MIT license
 
 import Database from 'better-sqlite3'
-import type {File, FileIndexStatus, ParsedAudioFile} from './types.ts'
+import type {File, FileIndexStatus, ParsedAudioFile, Track, Playlist} from './types.ts'
 import type {LibraryQuery, LibraryQueryResult, LibraryColumn, LibraryColumnValue} from '../query/types.ts'
-
-export interface Track {
-  id?: number
-  title: string
-  album: string
-  albumartist: string
-  genre: string
-  year: string | null
-  stars: number | null
-  grouping: string
-  filename: string
-  filedir: string
-  filemtime: number
-  track: string
-  trackOf: string
-  duration: number
-}
-
-export interface Playlist {
-  id: number
-  title: string
-}
 
 /**
  * Database class that handles all persistent data.
@@ -197,6 +175,22 @@ export class TuneDB {
   }
 
   /**
+   * Unpacks nested clauses and returns a list of parameters and values.
+   * 
+   * Used for filters, which may have multiple simultaneous selectors.
+   */
+  private unpackNestedClauses(nestedClauses: [string, string][][]): [string[][], string[]] {
+    const parameters: string[][] = []
+    const values: string[] = []
+    for (let n = 0; n < nestedClauses.length; ++n) {
+      const clause = nestedClauses[n]
+      parameters.push(clause.map(clauseItem => clauseItem[0]))
+      values.push(...clause.map(clauseItem => clauseItem[1]))
+    }
+    return [parameters, values]
+  }
+
+  /**
    * Returns library tracks, categories and metadata based on a query.
    */
   public runLibraryQuery(query: LibraryQuery): LibraryQueryResult {
@@ -216,31 +210,46 @@ export class TuneDB {
     // Selector clauses are WHERE clauses based on the playlist itself.
     // E.g. the "Hip Hop" playlist will always filter the files for that genre,
     // regardless of what columns the user has selected.
-    const selectorClauses: [string, string][] = query.category.selector.map(selector => {
+    const selectorClauses: [string, string][][] = query.category.selector.map(selector => {
       if (selector.primaryDirectory) {
-        return [`t.filedir = ?`, selector.primaryDirectory]
+        return [[`t.filedir = ?`, selector.primaryDirectory]]
       }
       throw new Error(`Unknown selector clause: ${JSON.stringify(selector)}`)
     })
 
     // Column clauses are WHERE clauses based on what columns the user has clicked on.
-    const columnClauses: [string, string][] = selectedColumnValues.map((value, n) => {
+    // Each column can have multiple items selected. In that case, it becomes an OR clause.
+    const columnClauses: [string, string][][] = selectedColumnValues.map((value, n) => {
       const col = usedColumnTypes[n]
-      return [`t.${col.type} = ?`, value!]
+      const clauses = []
+      for (let n = 0; n < value!.length; ++n) {
+        clauses.push([`t.${col.type} = ?`, value![n]] as [string, string])
+      }
+      return clauses
     })
 
-    const [selectorParameters, selectorValues] = this.unpackClauses(selectorClauses)
-    const [columnParameters, columnValues] = this.unpackClauses(columnClauses)
-    const combinedParameters = [...selectorParameters, ...columnParameters]
+    // Here we unpack the filters into a list of discrete columns we can query for.
+    // The selectors are always AND (this is a list of filters a smart playlist can have).
+    // For example: list all tracks with genre "Hip hop" AND stars = 5.
+    // The filters, on the other hand, are always OR. This is so that, when the user selects
+    // the artists "A Tribe Called Quest" and "MF DOOM" in the list, they both show up.
+    const [selectorParameters, selectorValues] = this.unpackNestedClauses(selectorClauses)
+    const [columnParameters, columnValues] = this.unpackNestedClauses(columnClauses)
     const combinedValues = [...selectorValues, ...columnValues]
+
+    const joinedSelectorClauses = selectorParameters.map(selectorParameter => selectorParameter.join(' and '))
+    const joinedColumnClauses = columnParameters.map(columnParameter => columnParameter.join(' or '))
+    const selectorClausesVerb = joinedSelectorClauses.length ? 'where' : ''
+    const columnClausesVerb = joinedSelectorClauses.length ? 'and' : 'where'
 
     // Query the tracks.
     const stmtQuery = this.db.prepare(`
       select t.*
       from track t
-      ${combinedParameters.length ? `where ${combinedParameters.join(' and ')}` : ''}
+      ${joinedSelectorClauses.length ? `${selectorClausesVerb} (${joinedSelectorClauses.join(' and ')})` : ''}
+      ${joinedColumnClauses.length ? `${columnClausesVerb} (${joinedColumnClauses.join(' and ')})` : ''}
       order by t.album asc, t.albumartist asc, t.track asc, t.id asc
-      limit 0, 200
+      limit 200 offset 10
     `)
     const tracks = stmtQuery.all(...combinedValues) as Track[]
 
@@ -252,9 +261,8 @@ export class TuneDB {
       const col = query.category.columns[n]
 
       // Determine the columns and values we'll filter by for this column.
-      const applicableColumnParameters = columnParameters.slice(0, n)
-      const applicableColumnValues = columnValues.slice(0, n)
-      const currentColumnParameters = [...selectorParameters, ...applicableColumnParameters]
+      const [applicablecolumnParameters, applicableColumnValues] = this.unpackNestedClauses(columnClauses.slice(0, n))
+      const applicableColumnClauses = applicablecolumnParameters.map(columnParameter => columnParameter.join(' or '))
       const currentColumnValues = [...selectorValues, ...applicableColumnValues]
 
       // Determine the ordering for this column.
@@ -268,7 +276,8 @@ export class TuneDB {
           min(t.year) as minYear,
           max(t.year) as maxYear
         from track t
-        ${currentColumnParameters.length ? `where ${currentColumnParameters.join(' and ')}` : ''}
+        ${joinedSelectorClauses.length ? `${selectorClausesVerb} (${joinedSelectorClauses.join(' and ')})` : ''}
+        ${applicableColumnClauses.length ? `${columnClausesVerb} (${applicableColumnClauses.join(' and ')})` : ''}
         group by t.${col.type}
         having t.${col.type} is not null
         ${ordering}
