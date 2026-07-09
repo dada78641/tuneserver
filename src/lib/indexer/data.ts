@@ -1,7 +1,7 @@
 // @dada78641/tuneserver <https://github.com/dada78641/tuneserver>
 // © MIT license
 
-import type {Track} from './db.ts'
+import type {Track} from './types.ts'
 import type {LibraryColumnValue} from '../query/types.ts'
 import type {ColumnOutput, TrackOutput} from './types.ts'
 
