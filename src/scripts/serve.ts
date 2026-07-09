@@ -8,18 +8,19 @@ import express, {type Request, type Response} from 'express'
 import cors from 'cors'
 import dotenv from 'dotenv'
 import {TuneIndexer} from '../lib/indexer/index.ts'
+import {WinampSkins} from '../lib/skins/index.ts'
 import {getVersion} from '../util/version.ts'
 import {getJSONResponse} from '../lib/server/res.ts'
 import {validateLibraryQuery} from '../lib/query/validate.ts'
 import type {LibraryQuery} from '../lib/query/types.ts'
 import {getTemplate} from '../lib/server/template.ts'
 import {getOutputTracks, getOutputColumns} from '../lib/indexer/data.ts'
-import type {VersionResponse, PlaylistsResponse, QueryResponse, ErrorResponse} from '../lib/server/types.ts'
+import type {VersionResponse, PlaylistsResponse, SkinsResponse, QueryResponse, ErrorResponse} from '../lib/server/types.ts'
 
 dotenv.config({quiet: true})
 
-const tx = new TuneIndexer()
-await tx.initialize()
+const tx = await (new TuneIndexer()).initialize()
+const ws = await (new WinampSkins()).initialize()
 
 async function runServer() {
   const app = express()
@@ -89,6 +90,76 @@ async function runServer() {
   app.get('/api/playlists', (req: Request, res: Response): PlaylistsResponse => {
     const data = tx.getPlaylists()
     return getJSONResponse(res, {playlists: data})
+  })
+
+  /**
+   * GET /api/skins
+   * 
+   * Returns the available Winamp skins.
+   */
+  app.get('/api/skins', async (req: Request, res: Response): Promise<SkinsResponse> => {
+    const data = await ws.getWinampSkins()
+    return getJSONResponse(res, {skins: data})
+  })
+
+  /**
+   * GET /skin/wsz/:id
+   * 
+   * Returns a skin file by ID.
+   */
+  app.get('/skin/wsz/:id', async (req: Request, res: Response): Promise<ErrorResponse | void> => {
+    const id = String(req.params.id)
+    let filePath
+    try {
+      filePath = await ws.getSkinPathByID(id, 'skin')
+    }
+    catch (err) {
+      if (!(err instanceof Error)) {
+        throw err
+      }
+      return getJSONResponse(res, {error: 'Skin not found'}, 404)
+    }
+    return res.sendFile(
+      filePath,
+      err => {
+        if (err) {
+          console.error('Error sending file:', err)
+          if (!res.headersSent) {
+            return getJSONResponse(res, {error: 'Failed to send file'}, 500)
+          }
+        }
+      }
+    )
+  })
+
+  /**
+   * GET /skin/image/:id
+   * 
+   * Returns a skin file by ID.
+   */
+  app.get('/skin/image/:id', async (req: Request, res: Response): Promise<ErrorResponse | void> => {
+    const id = String(req.params.id)
+    let filePath
+    try {
+      filePath = await ws.getSkinPathByID(id, 'image')
+    }
+    catch (err) {
+      if (!(err instanceof Error)) {
+        throw err
+      }
+      return getJSONResponse(res, {error: 'Skin not found'}, 404)
+    }
+    return res.sendFile(
+      filePath,
+      err => {
+        if (err) {
+          console.error('Error sending file:', err)
+          if (!res.headersSent) {
+            return getJSONResponse(res, {error: 'Failed to send file'}, 500)
+          }
+        }
+      }
+    )
   })
 
   /**

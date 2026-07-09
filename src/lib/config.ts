@@ -8,5 +8,9 @@ export interface Config {
     baseIdentifier: string
     dirPath: string
   }[]
+  winampSkinDirectories: {
+    inputPath: string
+    identifier: string
+  }[]
   playlists: LibraryCategory[]
 }
