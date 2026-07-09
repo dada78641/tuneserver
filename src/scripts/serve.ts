@@ -39,9 +39,9 @@ async function runServer() {
   })
 
   /**
-   * GET /api/playlists
+   * GET /file/:id
    * 
-   * Returns the playlists (both smart and regular) that we're showing files from.
+   * Serves a given file by id.
    */
   app.get('/file/:id', (req: Request, res: Response): ErrorResponse | void => {
     const track = tx.db.getTrackByID(Number(req.params.id))
