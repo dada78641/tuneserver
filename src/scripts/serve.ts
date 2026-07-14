@@ -14,7 +14,7 @@ import {getJSONResponse} from '../lib/server/res.ts'
 import {validateLibraryQuery} from '../lib/query/validate.ts'
 import type {LibraryQuery} from '../lib/query/types.ts'
 import {getTemplate} from '../lib/server/template.ts'
-import {getOutputTracks, getOutputColumns} from '../lib/indexer/data.ts'
+import {getOutputTracks, getOutputColumns, orderOutputTracks} from '../lib/indexer/data.ts'
 import type {VersionResponse, PlaylistsResponse, SkinsResponse, QueryResponse, ErrorResponse} from '../lib/server/types.ts'
 
 dotenv.config({quiet: true})
@@ -78,7 +78,8 @@ async function runServer() {
     const result = tx.db.runLibraryQuery(query)
     const tracks = getOutputTracks(result.tracks)
     const columns = getOutputColumns(result.columns)
-    const data = {query, result: {tracks, columns}}
+    const tracksOrdered = orderOutputTracks(tracks)
+    const data = {query, result: {tracks: tracksOrdered, columns}}
     return getJSONResponse(res, data)
   })
 

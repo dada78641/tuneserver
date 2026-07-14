@@ -1,7 +1,7 @@
 // @dada78641/tuneserver <https://github.com/dada78641/tuneserver>
 // © MIT license
 
-import type {TrackOutput, ColumnOutput} from '../indexer/types.ts'
+import type {TrackOutputOrdered, ColumnOutput} from '../indexer/types.ts'
 import type {LibraryCategory, LibraryQuery} from '../query/types.ts'
 import type {WinampSkin} from '../skins/types.ts'
 import type {Version} from '../../util/version.ts'
@@ -19,7 +19,7 @@ export type QueryResponse = QueryDataResponse | QueryErrorResponse
 export type QueryDataResponse = {
   query: LibraryQuery
   result: {
-    tracks: TrackOutput[]
+    tracks: TrackOutputOrdered[]
     columns: ColumnOutput[][]
   }
 }

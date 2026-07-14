@@ -3,7 +3,7 @@
 
 import type {Track} from './types.ts'
 import type {LibraryColumnValue} from '../query/types.ts'
-import type {ColumnOutput, TrackOutput} from './types.ts'
+import type {ColumnOutput, TrackOutput, TrackOutputOrdered} from './types.ts'
 
 /**
  * Formats a track string (or disc string).
@@ -97,4 +97,11 @@ export function getOutputTrack(track: Track): TrackOutput {
  */
 export function getOutputTracks(tracks: Track[]): TrackOutput[] {
   return tracks.map(track => getOutputTrack(track))
+}
+
+/**
+ * Adds each track's ordering to the object.
+ */
+export function orderOutputTracks(tracks: TrackOutput[]): TrackOutputOrdered[] {
+  return tracks.map((track, n) => ({...track, n}))
 }

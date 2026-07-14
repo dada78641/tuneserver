@@ -85,3 +85,5 @@ export interface TrackOutput {
   disc: string
   duration: string
 }
+
+export type TrackOutputOrdered = TrackOutput & {n: number}
