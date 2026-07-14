@@ -249,7 +249,7 @@ export class TuneDB {
       ${joinedSelectorClauses.length ? `${selectorClausesVerb} (${joinedSelectorClauses.join(' and ')})` : ''}
       ${joinedColumnClauses.length ? `${columnClausesVerb} (${joinedColumnClauses.join(' and ')})` : ''}
       order by t.album asc, t.albumartist asc, t.track asc, t.id asc
-      limit 200 offset 10
+      limit 200 offset 0
     `)
     const tracks = stmtQuery.all(...combinedValues) as Track[]
 
