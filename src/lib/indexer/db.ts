@@ -5,6 +5,9 @@ import Database from 'better-sqlite3'
 import type {File, FileIndexStatus, ParsedAudioFile, Track, Playlist} from './types.ts'
 import type {LibraryQuery, LibraryQueryResult, LibraryColumn, LibraryColumnValue} from '../query/types.ts'
 
+// Nested selection clauses for filtering columns.
+type NestedClauses = ([string, string] | null)[][]
+
 /**
  * Database class that handles all persistent data.
  * 
@@ -179,15 +182,33 @@ export class TuneDB {
    * 
    * Used for filters, which may have multiple simultaneous selectors.
    */
-  private unpackNestedClauses(nestedClauses: [string, string][][]): [string[][], string[]] {
-    const parameters: string[][] = []
-    const values: string[] = []
+  private unpackNestedClauses(nestedClauses: NestedClauses): [(string | null)[][], (string | null)[]] {
+    const parameters: (string | null)[][] = []
+    const values: (string | null)[] = []
     for (let n = 0; n < nestedClauses.length; ++n) {
       const clause = nestedClauses[n]
-      parameters.push(clause.map(clauseItem => clauseItem[0]))
-      values.push(...clause.map(clauseItem => clauseItem[1]))
+      if (clause[0] === null) {
+        parameters.push([null])
+        values.push(null)
+      }
+      else {
+        parameters.push(clause.map(clauseItem => (clauseItem as [string, string])[0]))
+        values.push(...clause.map(clauseItem => (clauseItem as [string, string])[1]))
+      }
     }
     return [parameters, values]
+  }
+
+  /**
+   * Removes selected columns that are null off the end of a selection query.
+   * 
+   * Selection columns filter the list of tracks to a given set of conditions.
+   * If a selection column is null, it means "any". The ones at the end are cut
+   * off since the result will not change.
+   */
+  private removeNullColumns(selectedColumns: LibraryQuery['selectedColumns']): LibraryQuery['selectedColumns'] {
+    const beforeLastNull = selectedColumns.findLastIndex(item => item !== null)
+    return selectedColumns.slice(0, beforeLastNull + 1)
   }
 
   /**
@@ -202,7 +223,7 @@ export class TuneDB {
     // to quickly filter the list of displayed files.
     // As the user selects something in a column, the columns to the right get filtered
     // as well so you can quickly hone in on specific albums, artists, etc.
-    const selectedColumnValues = query.selectedColumns.filter(col => col)
+    const selectedColumnValues = this.removeNullColumns(query.selectedColumns)
 
     // And here's the column types equal in length to what's selected.
     const usedColumnTypes = query.category.columns.slice(0, selectedColumnValues.length)
@@ -219,14 +240,20 @@ export class TuneDB {
 
     // Column clauses are WHERE clauses based on what columns the user has clicked on.
     // Each column can have multiple items selected. In that case, it becomes an OR clause.
-    const columnClauses: [string, string][][] = selectedColumnValues.map((value, n) => {
-      const col = usedColumnTypes[n]
-      const clauses = []
-      for (let n = 0; n < value!.length; ++n) {
-        clauses.push([`t.${col.type} = ?`, value![n]] as [string, string])
-      }
-      return clauses
-    })
+    const columnClauses: NestedClauses = selectedColumnValues
+      .map((value, n) => {
+        const col = usedColumnTypes[n]
+        const clauses = []
+        if (value === null) {
+          clauses.push(null)
+        }
+        else {
+          for (let n = 0; n < value.length; ++n) {
+            clauses.push([`t.${col.type} = ?`, value![n]] as [string, string])
+          }
+        }
+        return clauses
+      })
 
     // Here we unpack the filters into a list of discrete columns we can query for.
     // The selectors are always AND (this is a list of filters a smart playlist can have).
@@ -235,10 +262,14 @@ export class TuneDB {
     // the artists "A Tribe Called Quest" and "MF DOOM" in the list, they both show up.
     const [selectorParameters, selectorValues] = this.unpackNestedClauses(selectorClauses)
     const [columnParameters, columnValues] = this.unpackNestedClauses(columnClauses)
-    const combinedValues = [...selectorValues, ...columnValues]
+    const combinedValues = [...selectorValues, ...columnValues].filter(value => value !== null)
 
-    const joinedSelectorClauses = selectorParameters.map(selectorParameter => selectorParameter.join(' and '))
-    const joinedColumnClauses = columnParameters.map(columnParameter => columnParameter.join(' or '))
+    const joinedSelectorClauses = selectorParameters
+      .filter(columnParameter => columnParameter[0] !== null)
+      .map(selectorParameter => selectorParameter.join(' and '))
+    const joinedColumnClauses = columnParameters
+      .filter(columnParameter => columnParameter[0] !== null)
+      .map(columnParameter => columnParameter.join(' or '))
     const selectorClausesVerb = joinedSelectorClauses.length ? 'where' : ''
     const columnClausesVerb = joinedSelectorClauses.length ? 'and' : 'where'
 
@@ -261,9 +292,11 @@ export class TuneDB {
       const col = query.category.columns[n]
 
       // Determine the columns and values we'll filter by for this column.
-      const [applicablecolumnParameters, applicableColumnValues] = this.unpackNestedClauses(columnClauses.slice(0, n))
-      const applicableColumnClauses = applicablecolumnParameters.map(columnParameter => columnParameter.join(' or '))
-      const currentColumnValues = [...selectorValues, ...applicableColumnValues]
+      const [applicableColumnParameters, applicableColumnValues] = this.unpackNestedClauses(columnClauses.slice(0, n))
+      const applicableColumnClauses = applicableColumnParameters
+        .filter(columnParameter => columnParameter[0] !== null)
+        .map(columnParameter => columnParameter.join(' or '))
+      const currentColumnValues = [...selectorValues, ...applicableColumnValues].filter(value => value !== null)
 
       // Determine the ordering for this column.
       const ordering = this.columnOrdering(col)
